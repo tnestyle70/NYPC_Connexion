@@ -4,5 +4,6 @@ build/
 *.o
 *.log.tmp
 *.cache
+__pycache__/
 data/experiments/*
 !data/experiments/.gitkeep
