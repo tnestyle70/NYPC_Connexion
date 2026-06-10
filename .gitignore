@@ -1,0 +1,8 @@
+build/
+*.exe
+*.obj
+*.o
+*.log.tmp
+*.cache
+data/experiments/*
+!data/experiments/.gitkeep
