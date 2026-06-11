@@ -183,6 +183,50 @@ struct GreedyMarginBot : IBot {
     }
 };
 
+// s1: 사이트 샘플 AI 레플리카 (scripts/shadow_replay.py 로 동정, 2026-06-11 로그 32/32 일치).
+// 정책 = 1-ply 마진 그리디 (c3와 동급). 순회 = 칸 outer(행우선: 행1→6 × 열a→f × −,+) ×
+//        타일 inner(손패 도착 순서), strict > (먼저 발견된 수 우선). 사다리 외 회귀 게이트용.
+struct SiteReplicaBot : IBot {
+    const char* name() const override { return "s1"; }
+    static const std::vector<int8_t>& rowmajor_cells() {
+        static const std::vector<int8_t> v = [] {
+            std::vector<int8_t> out;
+            for (int r = 0; r < 6; ++r)
+                for (int c = 0; c < 6; ++c)
+                    for (int s = 0; s < 2; ++s) {
+                        int8_t id = topo().raw2id[raw_of(c, r, s)];
+                        if (id >= 0) out.push_back(id);
+                    }
+            return out;
+        }();
+        return v;
+    }
+    Move choose(State& st, long long, long long) override {
+        long long best = LLONG_MIN;
+        Move bm;
+        long long v0 = st.margin(me);
+        auto try_tile = [&](int cell, int t) {
+            State::Mark mk = st.place(me, cell, t);
+            long long d = st.margin(me) - v0;
+            st.unplace(mk);
+            if (d > best) {
+                best = d;
+                bm = {static_cast<int8_t>(cell), static_cast<int8_t>(t)};
+            }
+        };
+        for (int8_t cell : rowmajor_cells()) {
+            if ((st.occ >> cell) & 1ull) continue;
+            if (hand_seq[me]) {
+                for (int8_t t : *hand_seq[me]) try_tile(cell, t);
+            } else {
+                for (int t = 0; t < TYPE_N; ++t)
+                    if (st.hand[me][t] > 0) try_tile(cell, t);
+            }
+        }
+        return bm;
+    }
+};
+
 // c4~c7: minimax d0~d3 (짝수 depth = 방어형, 홀수 = 공격형).
 // 폭 상수는 10초 총시계 안에서 결정론을 지키는 고정값 (guide 04 표).
 struct MinimaxBot : IBot {
@@ -218,6 +262,7 @@ inline std::unique_ptr<IBot> make_bot(const std::string& name) {
     if (name == "c1") return std::make_unique<FirstBot>();
     if (name == "c2") return std::make_unique<GreedySelfBot>();
     if (name == "c3") return std::make_unique<GreedyMarginBot>();
+    if (name == "s1") return std::make_unique<SiteReplicaBot>();
     if (name == "c4") return std::make_unique<MinimaxBot>("c4", 0, 0, 0);
     if (name == "c5") return std::make_unique<MinimaxBot>("c5", 1, 24, 12);
     if (name == "c6") return std::make_unique<MinimaxBot>("c6", 2, 16, 8);
