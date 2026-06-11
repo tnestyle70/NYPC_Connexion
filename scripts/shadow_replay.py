@@ -172,6 +172,17 @@ def main():
     init, moves, scores = parse_log(args.log)
     print(f"log: {os.path.basename(args.log)}  (seat={args.seat}, 기록 점수 {scores})")
 
+    # 주머니 모델 상시 체크: 각자 16종×2장 (docs/GAME_RULES.md 판정 근거 유지)
+    from collections import Counter
+    acq = {"FIRST": Counter(init[:5]), "SECOND": Counter(init[5:])}
+    for side, _c, _p, drawn, _f in moves:
+        if drawn != "X0":
+            acq[side][drawn] += 1
+    bag_ok = all(max(c.values()) <= 2 and sum(c.values()) <= 32 for c in acq.values())
+    print(f"[주머니 모델] 각자 16종x2장: {'일치' if bag_ok else '위반!! 규칙 재검토 필요'} "
+          f"(F {sum(acq['FIRST'].values())}장/max{max(acq['FIRST'].values())}, "
+          f"S {sum(acq['SECOND'].values())}장/max{max(acq['SECOND'].values())})")
+
     total, members, ties, misses = policy_class_pass(moves, init, args.seat)
     print(f"[정책 클래스] 1-ply 마진 그리디 argmax 멤버십: {members}/{total}  (동률 국면 {ties}회)")
     for m in misses[:5]:
