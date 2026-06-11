@@ -82,3 +82,19 @@ docs/official_sample/   # 공식 예제 코드 보존 (cpp/rs)
   핀 고정: `node scripts/visualizer_engine_test.js` → 골든 24/20 + 사이트 로그 **196/304 재현**
   + **s1 섀도 32/32** (c3/c2 첫 불일치 위치까지 C++와 동일)
 
+## 로컬 컨테스트 포털 (2026-06-11)
+
+contest.nypc.co.kr/problems/1 의 로컬 미러 — 제출 → 컴파일 → **14배틀 채점** → 내역/재생.
+
+```bash
+# WSL (사전: bash scripts/dev_smoke.sh 로 build/sample_ai 빌드)
+python3 scripts/contest_server.py --port 8733
+# 브라우저: http://localhost:8733/problems/1
+```
+
+- 제출 탭: C++ 소스 붙여넣기/파일 → g++ 컴파일 → 사다리 c1~c7 × 선후공 = 14배틀 (고정 시드)
+- 제출 내역: 배틀 테이블(내 결과/1P/2P, 시간), **▶ = 시뮬레이터 재생**, ⬇ = 로그 다운로드, 코드 보기
+- 중간 평가 탭: 로컬 X승/14 (A/B/C) 지표
+- E2E: `python3 scripts/portal_e2e.py` (공식 greedy 샘플 제출 → 3승/14, 사다리 서열 일치 확인)
+- 저장: `data/experiments/submissions/<id>/` (gitignore 영역)
+

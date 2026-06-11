@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion — 로컬 컨테스트 포털</title>
+<style>
+  :root { --bg:#0d0e10; --panel:#17181b; --panel2:#202227; --line:#33363d;
+          --text:#e9eaee; --mut:#8b93a3; --acc:#5b8def; --ok:#46c282; --bad:#e0556a;
+          --red:#e23d3d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font:14px/1.55 "Segoe UI","Malgun Gothic",sans-serif; }
+  .wrap { max-width:920px; margin:0 auto; padding:14px 16px 60px; }
+  .tabs { display:flex; justify-content:center; gap:4px; background:var(--panel);
+          border:1px solid var(--line); border-radius:12px; padding:5px; width:fit-content;
+          margin:10px auto 16px; }
+  .tabs button { background:transparent; border:0; color:var(--mut); font:inherit;
+                 padding:7px 22px; border-radius:8px; cursor:pointer; font-weight:600; }
+  .tabs button.on { background:#fff; color:#111; }
+  .notice { display:flex; justify-content:center; gap:18px; background:#fff; color:#111;
+            border-radius:10px; padding:9px; font-weight:600; margin-bottom:14px; }
+  .notice a { color:#111; text-decoration:none; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px;
+          padding:14px; margin-bottom:14px; }
+  textarea#src { width:100%; height:380px; background:#101114; color:#dcdfe6;
+                 border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+                 font:12.5px/1.5 Consolas,monospace; white-space:pre; }
+  .row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:8px 0; }
+  .chip { background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+          padding:6px 12px; color:var(--mut); font-size:13px; }
+  button { background:var(--panel2); color:var(--text); border:1px solid var(--line);
+           border-radius:8px; padding:7px 14px; font:inherit; cursor:pointer; }
+  button:hover { border-color:var(--acc); }
+  button.submit { background:var(--red); border-color:var(--red); color:#fff; font-weight:700;
+                  padding:9px 26px; }
+  button.submit:disabled { opacity:.55; cursor:wait; }
+  input[type=text] { background:var(--panel2); color:var(--text); border:1px solid var(--line);
+                     border-radius:8px; padding:7px 10px; font:inherit; flex:1; }
+  table { width:100%; border-collapse:collapse; }
+  th,td { border:1px solid var(--line); padding:9px 10px; text-align:center; }
+  th { background:var(--panel2); font-weight:600; }
+  td.win { color:var(--ok); font-weight:700; }
+  td.lose { color:var(--bad); font-weight:700; }
+  td.draw { color:var(--mut); font-weight:700; }
+  td.me { outline:1.5px solid var(--ok); outline-offset:-2px; }
+  td.gray { color:var(--mut); background:#1b1d21; }
+  .score { font-size:16px; font-weight:700; }
+  .sub { color:var(--mut); font-size:11.5px; }
+  .slist { display:flex; flex-direction:column; gap:8px; }
+  .sitem { display:flex; justify-content:space-between; align-items:center; gap:10px;
+           background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+           padding:10px 14px; cursor:pointer; }
+  .sitem:hover { border-color:var(--acc); }
+  .back { color:var(--mut); cursor:pointer; margin-bottom:8px; display:inline-block; }
+  .icon { cursor:pointer; font-size:15px; padding:3px 7px; border-radius:6px; }
+  .icon:hover { background:var(--panel2); }
+  pre#codeview { background:#101114; border:1px solid var(--line); border-radius:8px;
+                 padding:12px; overflow:auto; max-height:480px;
+                 font:12px/1.55 Consolas,monospace; counter-reset:ln; }
+  pre#codeview span.l { display:block; }
+  pre#codeview span.l::before { counter-increment:ln; content:counter(ln);
+    display:inline-block; width:3.2em; color:#565b66; text-align:right; margin-right:1.1em; }
+  .badge { padding:2px 10px; border-radius:10px; font-size:12px; font-weight:700; }
+  .badge.ok { background:rgba(70,194,130,.15); color:var(--ok); }
+  .badge.bad { background:rgba(224,85,106,.15); color:var(--bad); }
+  .hidden { display:none; }
+  h3 { margin:4px 0 10px; }
+  .mut { color:var(--mut); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="tabs">
+    <button id="tabSubmit" class="on">제출</button>
+    <button id="tabHistory">제출 내역</button>
+    <button id="tabEval">중간 평가</button>
+  </div>
+  <div class="notice">
+    <a href="GAME_RULES.md" target="_blank">📋 게임 규칙</a>
+    <a href="visualizer.html" target="_blank">🎮 시뮬레이터</a>
+    <span class="mut" style="color:#666;font-weight:400">로컬 사다리 c1~c7 × 선후공 = 14배틀 · 고정 시드</span>
+  </div>
+
+  <!-- 제출 -->
+  <div id="viewSubmit">
+    <div class="card">
+      <div class="row">
+        <input type="text" id="note" placeholder="제출 노트 (선택) — 제출을 설명하는 메모">
+        <input type="file" id="srcfile" accept=".cpp,.cc,.cxx" style="color:var(--mut)">
+      </div>
+      <textarea id="src" spellcheck="false" placeholder="// C++ 소스를 붙여넣거나 파일을 선택하세요
+// 프로토콜: READY→OK / INIT / TIME→PUT p T / GET / OPP / FINISH"></textarea>
+      <div class="row">
+        <span class="chip">data.bin (선택) — 미지원 (파일 없음)</span>
+        <span class="chip">C++20 (g++, WSL)</span>
+        <span class="chip">⏱ 게임당 10초 · 고정 시드</span>
+        <span style="flex:1"></span>
+        <button class="submit" id="btnSubmit">🚀 제출</button>
+      </div>
+      <div id="submitMsg" class="mut"></div>
+    </div>
+  </div>
+
+  <!-- 제출 내역 -->
+  <div id="viewHistory" class="hidden">
+    <div id="histList" class="card"><div class="slist" id="slist"></div></div>
+    <div id="histDetail" class="hidden">
+      <span class="back" id="btnBack">← 돌아가기</span>
+      <div class="card" id="noteCard"></div>
+      <div class="card">
+        <div class="row" id="compileLine"></div>
+        <div class="sub" style="margin-bottom:8px">내 채점 결과는 강조 테두리, 상대(샘플 AI) 결과는 회색으로 표시됩니다.</div>
+        <table id="btable">
+          <thead><tr><th>배틀</th><th>내 결과</th><th>로그</th><th>1P</th><th>2P</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="card row">
+        <b>제출한 코드</b> <span class="mut" id="langLabel"></span>
+        <span style="flex:1"></span>
+        <button id="btnCode">코드 보기</button>
+      </div>
+      <div class="card hidden" id="codeCard"><pre id="codeview"></pre></div>
+    </div>
+  </div>
+
+  <!-- 중간 평가 -->
+  <div id="viewEval" class="hidden">
+    <div class="card">
+      <h3>중간 평가 (로컬)</h3>
+      <div id="evalBody" class="mut">제출이 없습니다.</div>
+      <div class="sub" style="margin-top:10px">
+        실제 중간 평가(전국구 스위스)는 사이트에서 — 여기는 사다리 14배틀 기준의 로컬 지표입니다.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const VIEWS = { submit: "viewSubmit", history: "viewHistory", eval: "viewEval" };
+const TABS = { submit: "tabSubmit", history: "tabHistory", eval: "tabEval" };
+let currentDetail = null;
+
+function show(view) {
+  for (const v in VIEWS) {
+    $(VIEWS[v]).classList.toggle("hidden", v !== view);
+    $(TABS[v]).classList.toggle("on", v === view);
+  }
+  if (view === "history") loadList();
+  if (view === "eval") loadEval();
+}
+$("tabSubmit").onclick = () => show("submit");
+$("tabHistory").onclick = () => show("history");
+$("tabEval").onclick = () => show("eval");
+
+$("srcfile").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  f.text().then((t) => { $("src").value = t; });
+});
+
+$("btnSubmit").onclick = async () => {
+  const source = $("src").value;
+  if (!source.trim()) { $("submitMsg").textContent = "소스가 비었습니다"; return; }
+  $("btnSubmit").disabled = true;
+  $("submitMsg").textContent = "컴파일 + 14배틀 채점 중… (수십 초 걸릴 수 있음)";
+  try {
+    const r = await fetch("/api/submit", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source, note: $("note").value }),
+    });
+    const meta = await r.json();
+    if (meta.error) throw new Error(meta.error);
+    $("submitMsg").textContent = "";
+    show("history");
+    openDetail(meta.id);
+  } catch (e) {
+    $("submitMsg").textContent = "실패: " + e.message;
+  }
+  $("btnSubmit").disabled = false;
+};
+
+async function loadList() {
+  $("histDetail").classList.add("hidden");
+  $("histList").classList.remove("hidden");
+  const list = await (await fetch("/api/submissions")).json();
+  const el = $("slist");
+  el.innerHTML = "";
+  if (!list.length) { el.innerHTML = '<span class="mut">제출 내역이 없습니다.</span>'; return; }
+  for (const m of list) {
+    const d = document.createElement("div");
+    d.className = "sitem";
+    const res = m.compile === "ok"
+      ? `<b>${m.wins}승</b> / 14 <span class="sub">(A ${m.groups.A[0]}/${m.groups.A[1]} · B ${m.groups.B[0]}/${m.groups.B[1]} · C ${m.groups.C[0]}/${m.groups.C[1]})</span>`
+      : '<span class="badge bad">컴파일 에러</span>';
+    d.innerHTML = `<span><b>#${m.id}</b> <span class="sub">${m.ts}</span><br>
+       <span class="sub">${m.note || "(노트 없음)"}</span></span><span>${res}</span>`;
+    d.onclick = () => openDetail(m.id);
+    el.appendChild(d);
+  }
+}
+
+function fmtSec(ms) { return (ms / 1000).toFixed(3) + "초"; }
+
+async function openDetail(id) {
+  const m = await (await fetch("/api/submission/" + id)).json();
+  currentDetail = m;
+  $("histList").classList.add("hidden");
+  $("histDetail").classList.remove("hidden");
+  $("codeCard").classList.add("hidden");
+  $("noteCard").innerHTML = `🗒 <b>제출 노트</b> — ${m.note || "(제출 노트가 없습니다)"}
+     <span class="sub" style="float:right">#${m.id} · ${m.ts}</span>`;
+  if (m.compile !== "ok") {
+    $("compileLine").innerHTML = '<span class="badge bad">컴파일 실패</span>';
+    $("btable").querySelector("tbody").innerHTML =
+      `<tr><td colspan="5" style="text-align:left"><pre style="white-space:pre-wrap;margin:0">${escapeHtml(m.compile_msg || "")}</pre></td></tr>`;
+  } else {
+    $("compileLine").innerHTML = `<span class="badge ok">컴파일 성공</span>
+      <b style="margin-left:8px">${m.wins}승 / 14</b>
+      <span class="sub">(A ${m.groups.A[0]}/${m.groups.A[1]} | B ${m.groups.B[0]}/${m.groups.B[1]} | C ${m.groups.C[0]}/${m.groups.C[1]})</span>`;
+    const tb = $("btable").querySelector("tbody");
+    tb.innerHTML = "";
+    for (const b of m.battles) {
+      const tr = document.createElement("tr");
+      const myMs = b.my_seat === 0 ? b.ms_first : b.ms_second;
+      const myScore = b.my_seat === 0 ? b.score_first : b.score_second;
+      const cls = b.result === "승리" ? "win" : b.result === "무승부" ? "draw" : "lose";
+      const fault = b.fault ? `<div class="sub">fault: seat${b.fault.seat}</div>` : "";
+      const p1me = b.my_seat === 0, p2me = !p1me;
+      tr.innerHTML = `
+        <td><b>${b.no}</b><div class="sub">${b.tier} · ${b.desc}</div></td>
+        <td class="${cls}">${b.result}<div class="score" style="color:inherit">✓ ${myScore}</div>
+            <div class="sub">⏱ ${fmtSec(myMs)} · —MiB</div>${fault}</td>
+        <td><span class="icon" title="시뮬레이터 재생"
+              onclick="window.open('/visualizer.html?log=/api/log/${m.id}/${b.no}','_blank')">▶</span>
+            <span class="icon" title="로그 다운로드"
+              onclick="location.href='/api/log/${m.id}/${b.no}?dl=1'">⬇</span></td>
+        <td class="${p1me ? "me" : "gray"}">✓ ${b.score_first}<div class="sub">⏱ ${fmtSec(b.ms_first)}</div></td>
+        <td class="${p2me ? "me" : "gray"}">✓ ${b.score_second}<div class="sub">⏱ ${fmtSec(b.ms_second)}</div></td>`;
+      tb.appendChild(tr);
+    }
+  }
+  $("langLabel").textContent = m.lang || "";
+}
+
+$("btnBack").onclick = loadList;
+$("btnCode").onclick = async () => {
+  if (!currentDetail) return;
+  const t = await (await fetch("/api/source/" + currentDetail.id)).text();
+  $("codeview").innerHTML = t.split("\n").map((l) => `<span class="l">${escapeHtml(l)}</span>`).join("");
+  $("codeCard").classList.toggle("hidden");
+};
+
+async function loadEval() {
+  const list = await (await fetch("/api/submissions")).json();
+  const ok = list.filter((m) => m.compile === "ok");
+  if (!ok.length) { $("evalBody").textContent = "채점된 제출이 없습니다."; return; }
+  const best = ok.reduce((a, b) => (b.wins > a.wins ? b : a));
+  const last = ok[0];
+  $("evalBody").innerHTML =
+    `최근 제출 <b>#${last.id}</b>: <b>${last.wins}승/14</b>
+     (A ${last.groups.A[0]}/4 | B ${last.groups.B[0]}/6 | C ${last.groups.C[0]}/4)<br>
+     최고 제출 <b>#${best.id}</b>: <b>${best.wins}승/14</b> · 총 제출 ${list.length}건`;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+show("submit");
+</script>
+</body>
+</html>

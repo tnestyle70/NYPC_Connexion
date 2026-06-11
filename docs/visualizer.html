@@ -379,6 +379,17 @@ $("btnLoad").addEventListener("click", () => {
 });
 document.querySelectorAll("input[name=lens]").forEach((r) => r.addEventListener("change", render));
 newGame();
+
+// ?log=URL — 포털 '▶ 재생' 연동: 로그를 받아 리플레이 자동 시작
+const logUrl = new URLSearchParams(location.search).get("log");
+if (logUrl) {
+  fetch(logUrl).then((r) => r.text()).then((t) => {
+    $("logbox").value = t.trim();
+    $("btnLoad").click();
+    $("speed").value = 150;
+    startAuto();
+  }).catch((e) => setStatus("로그 로드 실패: " + e.message, true));
+}
 </script>
 </body>
 </html>
