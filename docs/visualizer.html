@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion 시뮬레이터</title>
+<style>
+  :root {
+    --bg:#15171c; --panel:#1e2128; --panel2:#262a33; --line:#3a3f4b;
+    --text:#e8eaf0; --mut:#8b93a3; --acc:#5b8def; --ok:#3fbf7f; --bad:#e0556a;
+    --tR:#D94470; --tG:#009B87; --tB:#2C7EC1; --tY:#F5C33F;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font:14px/1.5 "Segoe UI", "Malgun Gothic", sans-serif; }
+  header { display:flex; align-items:center; gap:12px; padding:10px 18px;
+           border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:17px; margin:0; }
+  #selftest { font-size:12px; padding:2px 10px; border-radius:10px; background:var(--panel2); }
+  #selftest.ok { color:var(--ok); } #selftest.bad { color:var(--bad); }
+  main { display:flex; gap:14px; padding:14px 18px; flex-wrap:wrap; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  #boardCard { flex:0 0 auto; }
+  #side { flex:1 1 360px; min-width:340px; display:flex; flex-direction:column; gap:12px; }
+  svg { display:block; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:4px 0; }
+  select,input[type=number],button,textarea {
+    background:var(--panel2); color:var(--text); border:1px solid var(--line);
+    border-radius:6px; padding:5px 9px; font:inherit; }
+  button { cursor:pointer; } button:hover { border-color:var(--acc); }
+  button.primary { background:var(--acc); border-color:var(--acc); color:#fff; }
+  textarea { width:100%; height:74px; font:12px/1.4 Consolas,monospace; }
+  .score { display:flex; gap:10px; }
+  .score .box { flex:1; text-align:center; padding:8px; border-radius:8px; background:var(--panel2); }
+  .score .num { font-size:26px; font-weight:700; }
+  .score .lbl { font-size:12px; color:var(--mut); }
+  .hand { display:flex; gap:5px; flex-wrap:wrap; min-height:34px; align-items:center; }
+  .chip { width:30px; height:30px; border-radius:50%; display:flex; align-items:center;
+          justify-content:center; font-weight:700; font-size:14px; color:#fff;
+          border:2px solid transparent; user-select:none; }
+  .chip.sel { border-color:#fff; box-shadow:0 0 0 2px var(--acc); cursor:pointer; }
+  .chip.clickable { cursor:pointer; }
+  #movelog { height:170px; overflow-y:auto; font:12px/1.5 Consolas,monospace; color:var(--mut);
+             background:var(--panel2); border-radius:6px; padding:6px 10px; white-space:pre; }
+  #status { font-weight:600; min-height:22px; }
+  .mut { color:var(--mut); font-size:12px; }
+  label.radio { margin-right:8px; cursor:pointer; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Connexion 시뮬레이터</h1>
+  <span id="selftest">엔진 검증 중…</span>
+  <span class="mut">규칙 진실원: src/core.hpp · 검증: scripts/visualizer_engine_test.js</span>
+</header>
+<main>
+  <div class="card" id="boardCard">
+    <svg id="board" width="600" height="468" viewBox="0 0 600 468"></svg>
+    <div class="row">
+      <span class="mut">연결 렌즈:</span>
+      <label class="radio"><input type="radio" name="lens" value="pat" checked> P1 문양</label>
+      <label class="radio"><input type="radio" name="lens" value="col"> P2 색</label>
+      <label class="radio"><input type="radio" name="lens" value="none"> 없음</label>
+    </div>
+  </div>
+
+  <div id="side">
+    <div class="card">
+      <div class="score">
+        <div class="box"><div class="num" id="scoreP1">0</div><div class="lbl">P1 선공 · 문양 Σn²</div></div>
+        <div class="box"><div class="num" id="scoreP2">0</div><div class="lbl">P2 후공 · 색 Σn²</div></div>
+        <div class="box"><div class="num" id="plyNum">0/64</div><div class="lbl">수</div></div>
+      </div>
+      <div id="status"></div>
+    </div>
+
+    <div class="card">
+      <div class="row"><b>P1 손패</b> <span class="mut" id="bag0"></span></div>
+      <div class="hand" id="hand0"></div>
+      <div class="row"><b>P2 손패</b> <span class="mut" id="bag1"></span></div>
+      <div class="hand" id="hand1"></div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <select id="mode">
+          <option value="ai">AI vs AI</option>
+          <option value="h0">사람(선공) vs AI</option>
+          <option value="h1">AI vs 사람(후공)</option>
+          <option value="replay">리플레이</option>
+        </select>
+        P1 <select id="bot0"></select>
+        P2 <select id="bot1"></select>
+        시드 <input id="seed" type="number" value="1" style="width:76px">
+      </div>
+      <div class="row">
+        <button class="primary" id="btnNew">새 게임</button>
+        <button id="btnPlay">▶ 자동</button>
+        <button id="btnStep">한 수</button>
+        <span class="mut">속도</span>
+        <input id="speed" type="range" min="60" max="1200" value="350" style="width:110px">
+      </div>
+      <div class="row mut">리플레이: 사이트 로그(INIT/FIRST/SECOND…) 또는 referee JSONL 한 줄 붙여넣기</div>
+      <textarea id="logbox" placeholder="INIT R1 B2 G2 Y2 Y3 B4 G3 B4 R3 G3&#10;FIRST c1+ G2 B3 0&#10;..."></textarea>
+      <div class="row"><button id="btnLoad">리플레이 로드</button><span class="mut" id="repinfo"></span></div>
+    </div>
+
+    <div class="card"><div id="movelog"></div></div>
+  </div>
+</main>
+
+<script src="visualizer_engine.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const SVGNS = "http://www.w3.org/2000/svg";
+const TCOLOR = { R: "var(--tR)", G: "var(--tG)", B: "var(--tB)", Y: "var(--tY)" };
+const BOTS = ["c1", "c2", "c3", "s1", "c4"];
+const BOT_DESC = { c1: "c1 바닥", c2: "c2 공식예제", c3: "c3 마진그리디", s1: "s1 사이트봇", c4: "c4 minimax d0" };
+
+// 좌표 (행 6이 위)
+function cellXY(name) {
+  const col = "abcdef".indexOf(name[0]);
+  const row = +name[1];
+  const x = 48 + col * 94 + (name[2] === "+" ? 42 : 0);
+  const y = 40 + (6 - row) * 70;
+  return [x, y];
+}
+
+let G = null, mode = "ai", players = ["c3", "s1"], running = false, timer = null;
+let replay = null, repIdx = 0, lastCell = null, selTile = -1, finished = false;
+
+function setupBots() {
+  for (const sid of ["bot0", "bot1"]) {
+    const sel = $(sid);
+    BOTS.forEach((b) => {
+      const o = document.createElement("option");
+      o.value = b; o.textContent = BOT_DESC[b];
+      sel.appendChild(o);
+    });
+  }
+  $("bot0").value = "c3"; $("bot1").value = "s1";
+}
+
+function humanSeat() { return mode === "h0" ? 0 : mode === "h1" ? 1 : -1; }
+
+function newGame() {
+  stopAuto(); finished = false; lastCell = null; selTile = -1;
+  $("movelog").textContent = ""; $("repinfo").textContent = "";
+  mode = $("mode").value;
+  players = [$("bot0").value, $("bot1").value];
+  G = new CX.Game();
+  if (mode === "replay") {
+    if (!replay) { setStatus("리플레이 로그를 먼저 로드하세요", true); return; }
+    if (replay.hands0) G.setupReplay(replay.hands0);
+    else { G.setupReplay([[], []]); }
+    repIdx = 0;
+  } else {
+    G.setupLive(+$("seed").value || 1);
+  }
+  render(); updateStatus();
+}
+
+function setStatus(s, warn) {
+  $("status").textContent = s;
+  $("status").style.color = warn ? "var(--bad)" : "var(--text)";
+}
+
+function updateStatus() {
+  if (!G) return;
+  if (finished) return;
+  if (G.ply >= 64) { finish(); return; }
+  const seat = G.toMove();
+  const who = seat === 0 ? "P1(문양)" : "P2(색)";
+  if (mode === "replay") setStatus(`${who} 차례 — 리플레이 ${repIdx}/${replay ? replay.moves.length : 0}`);
+  else if (seat === humanSeat()) setStatus(`${who} 차례 — 손패 타일을 고르고 빈 칸을 클릭`);
+  else setStatus(`${who} 차례 — ${BOT_DESC[players[seat]]}`);
+}
+
+function finish() {
+  finished = true; stopAuto();
+  const p1 = G.patScore(), p2 = G.colScore();
+  let s = `종료 — P1 ${p1} : ${p2} P2 → ` + (p1 > p2 ? "P1 승" : p2 > p1 ? "P2 승" : "무승부");
+  if (mode === "replay" && replay && replay.scores && replay.scores.first != null) {
+    const ok = p1 === replay.scores.first && p2 === replay.scores.second;
+    s += ok ? "  (기록 점수와 일치 ✓)" : `  (기록 ${replay.scores.first}:${replay.scores.second} 불일치!)`;
+  }
+  setStatus(s);
+}
+
+function logMove(seat, cell, tile, dPat, dCol, draw) {
+  const n = String(G.ply).padStart(2);
+  const row = `${n}. ${seat === 0 ? "P1" : "P2"} ${tile}@${cell}  Δ문양 ${String(dPat).padStart(3)}  Δ색 ${String(dCol).padStart(3)}  드로우 ${draw || "X0"}`;
+  const el = $("movelog");
+  el.textContent += row + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+
+function applyMove(seat, cell, tile, drawRec) {
+  const { dPat, dCol } = G.placeDelta(cell, tile);
+  G.place(seat, cell, tile);
+  let draw = null;
+  if (mode === "replay") {
+    draw = drawRec && drawRec !== "X0" ? drawRec : null;
+  } else {
+    draw = G.bags[seat].length ? G.bags[seat].pop() : null;
+  }
+  if (draw) G.hands[seat].push(draw);
+  lastCell = cell;
+  logMove(seat, cell, tile, dPat, dCol, draw);
+  render(); updateStatus();
+  if (G.ply >= 64) finish();
+}
+
+function step() {
+  if (!G || finished) return false;
+  if (mode === "replay") {
+    if (!replay || repIdx >= replay.moves.length) { finish(); return false; }
+    const m = replay.moves[repIdx++];
+    applyMove(m.seat, m.cell, m.tile, m.draw);
+    return true;
+  }
+  const seat = G.toMove();
+  if (seat === humanSeat()) return false; // 사람 입력 대기
+  const mv = CX.bots[players[seat]](G, seat);
+  if (!mv) { finish(); return false; }
+  applyMove(seat, mv.cell, mv.tile);
+  return true;
+}
+
+function autoTick() {
+  if (!running) return;
+  const moved = step();
+  if (!moved || finished) { stopAuto(); return; }
+  timer = setTimeout(autoTick, +$("speed").value);
+}
+function startAuto() {
+  if (running) return;
+  running = true; $("btnPlay").textContent = "⏸ 정지";
+  autoTick();
+}
+function stopAuto() {
+  running = false;
+  if (timer) clearTimeout(timer);
+  $("btnPlay").textContent = "▶ 자동";
+}
+
+// --- 입력 (사람 모드): 손패 칩 선택 → 빈 칸 클릭 ---
+function onCellClick2(name) {
+  if (!G || finished || mode === "replay") return;
+  const seat = G.toMove();
+  if (seat !== humanSeat()) return;
+  if (G.board[CX.CELL_ID[name]]) return;
+  if (selTile < 0 || selTile >= G.hands[seat].length) { setStatus("손패 타일을 먼저 선택하세요", true); return; }
+  const tile = G.hands[seat][selTile];
+  selTile = -1;
+  applyMove(seat, name, tile);
+  // 봇 자동 응수
+  setTimeout(() => { if (!finished && G.toMove() !== humanSeat()) step(); }, 250);
+}
+
+// --- 렌더 ---
+function lensKey() {
+  const r = document.querySelector("input[name=lens]:checked");
+  return r ? r.value : "pat";
+}
+
+function render() {
+  const svg = $("board");
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const mk = (tag, attrs, txt) => {
+    const e = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (txt !== undefined) e.textContent = txt;
+    svg.appendChild(e);
+    return e;
+  };
+  // 행/열 라벨
+  for (let r = 1; r <= 6; r++) {
+    const [, y] = cellXY("a" + r + "+");
+    mk("text", { x: 14, y: y + 4, fill: "var(--mut)", "font-size": 11 }, r);
+  }
+  for (let c = 0; c < 6; c++) {
+    const [x1] = cellXY("abcdef"[c] + "1-");
+    mk("text", { x: x1 + 21, y: 458, fill: "var(--mut)", "font-size": 12, "text-anchor": "middle" }, "abcdef"[c]);
+  }
+  // 렌즈 간선 (타일 아래)
+  const lens = lensKey();
+  if (G && lens !== "none") {
+    const idx = lens === "pat" ? 1 : 0;
+    const color = lens === "pat" ? "#ffffff" : "#ffd34d";
+    for (const a of CX.CELLS) {
+      const ta = G.board[CX.CELL_ID[a]];
+      if (!ta) continue;
+      for (const b of CX.NEIGH[a]) {
+        if (b < a) continue; // 한 번만
+        const tb = G.board[CX.CELL_ID[b]];
+        if (!tb || ta[idx] !== tb[idx]) continue;
+        const [x1, y1] = cellXY(a), [x2, y2] = cellXY(b);
+        mk("line", { x1, y1, x2, y2, stroke: color, "stroke-width": 5, "stroke-opacity": 0.45 });
+      }
+    }
+  }
+  // 기본 인접 간선 (옅게)
+  for (const a of CX.CELLS) {
+    for (const b of CX.NEIGH[a]) {
+      if (b < a) continue;
+      const [x1, y1] = cellXY(a), [x2, y2] = cellXY(b);
+      mk("line", { x1, y1, x2, y2, stroke: "var(--line)", "stroke-width": 1 });
+    }
+  }
+  // 칸/타일
+  for (const name of CX.CELLS) {
+    const [x, y] = cellXY(name);
+    const t = G ? G.board[CX.CELL_ID[name]] : null;
+    if (t) {
+      mk("circle", { cx: x, cy: y, r: 15, fill: TCOLOR[t[0]],
+                     stroke: name === lastCell ? "#fff" : "rgba(0,0,0,.35)",
+                     "stroke-width": name === lastCell ? 3 : 1 });
+      mk("text", { x, y: y + 5, "text-anchor": "middle", "font-size": 14, "font-weight": 700,
+                   fill: t[0] === "Y" ? "#21242b" : "#fff" }, t[1]);
+    } else {
+      const c = mk("circle", { cx: x, cy: y, r: 13, fill: "transparent",
+                               stroke: "var(--line)", "stroke-width": 1.2, "stroke-dasharray": "2 3" });
+      c.style.cursor = "pointer";
+      c.addEventListener("click", () => onCellClick2(name));
+      const lab = mk("text", { x, y: y + 3, "text-anchor": "middle", "font-size": 8,
+                               fill: "var(--mut)", "pointer-events": "none" }, name[2]);
+      lab.style.opacity = 0.6;
+    }
+  }
+  // 패널
+  if (G) {
+    $("scoreP1").textContent = G.patScore();
+    $("scoreP2").textContent = G.colScore();
+    $("plyNum").textContent = G.ply + "/64";
+    for (const p of [0, 1]) {
+      const div = $("hand" + p);
+      div.innerHTML = "";
+      G.hands[p].forEach((t, i) => {
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        chip.style.background = getComputedStyle(document.documentElement)
+          .getPropertyValue({ R: "--tR", G: "--tG", B: "--tB", Y: "--tY" }[t[0]]);
+        chip.textContent = t[1];
+        chip.style.color = t[0] === "Y" ? "#21242b" : "#fff";
+        if (p === humanSeat() && G.toMove() === p && !finished && mode !== "replay") {
+          chip.classList.add("clickable");
+          if (i === selTile) chip.classList.add("sel");
+          chip.addEventListener("click", () => { selTile = i === selTile ? -1 : i; render(); });
+        }
+        div.appendChild(chip);
+      });
+      $("bag" + p).textContent = mode === "replay"
+        ? "(리플레이 — 드로우는 기록을 따름)"
+        : `주머니 ${G.bags[p].length}장`;
+    }
+  }
+}
+
+// --- 초기화 ---
+setupBots();
+const st = CX.goldenSelfTest();
+$("selftest").textContent = st.ok ? "엔진 자가검증 ✓ 골든 24/20" : "엔진 검증 실패: " + st.fails.join(",");
+$("selftest").className = st.ok ? "ok" : "bad";
+$("btnNew").addEventListener("click", newGame);
+$("btnStep").addEventListener("click", () => { stopAuto(); step(); });
+$("btnPlay").addEventListener("click", () => { running ? stopAuto() : startAuto(); });
+$("btnLoad").addEventListener("click", () => {
+  try {
+    replay = CX.parseAnyLog($("logbox").value);
+    if (!replay.moves.length) throw new Error("수가 없음");
+    $("mode").value = "replay";
+    newGame(); // newGame이 repinfo를 비우므로 안내는 그 뒤에 쓴다
+    $("repinfo").textContent = `${replay.moves.length}수` +
+      (replay.hands0 ? ", 초기 손패 OK" : ", 초기 손패 정보 없음(보드만 재생)") +
+      (replay.scores && replay.scores.first != null ? `, 기록 ${replay.scores.first}:${replay.scores.second}` : "");
+  } catch (e) { $("repinfo").textContent = "파싱 실패: " + e.message; }
+});
+document.querySelectorAll("input[name=lens]").forEach((r) => r.addEventListener("change", render));
+newGame();
+</script>
+</body>
+</html>

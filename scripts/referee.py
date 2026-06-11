@@ -97,6 +97,7 @@ def play_game(cmd_first, cmd_second, seed, clock_ms=CLOCK_MS_DEFAULT, strict_tim
         "seed": seed,
         "first": cmd_first,
         "second": cmd_second,
+        "hands0": [list(hands[0]), list(hands[1])],  # 초기 손패 (visualizer 리플레이용)
         "moves": [],
         "score_first": 0,
         "score_second": 0,

@@ -72,3 +72,13 @@ docs/official_sample/   # 공식 예제 코드 보존 (cpp/rs)
 전체 빌드+게이트 (WSL): `bash scripts/dev_smoke.sh`
 게이트 현황: G1 8/8 일치, G2 PASS, G3 단조(0.75~1.00), G4 PASS, 타이밍 최대 16ms/수.
 
+## 시각화 (2026-06-11)
+
+`docs/visualizer.html` — 브라우저로 여는 오프라인 단일 페이지 시뮬레이터.
+
+- AI vs AI 관전(c1/c2/c3/s1/c4, 시드·속도), 사람 vs AI 대국, **사이트 로그·referee JSONL 리플레이**
+- 문양/색 연결 렌즈(Σn² 성분이 눈에 보임), 수별 Δ문양/Δ색 로그, 양측 손패·주머니 표시
+- 엔진 = `docs/visualizer_engine.js` (C++ core.hpp 의 JS 미러).
+  핀 고정: `node scripts/visualizer_engine_test.js` → 골든 24/20 + 사이트 로그 **196/304 재현**
+  + **s1 섀도 32/32** (c3/c2 첫 불일치 위치까지 C++와 동일)
+
